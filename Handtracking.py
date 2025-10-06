@@ -7,7 +7,8 @@ import socket
 # ==================== Main Program ====================
 def main():
     # ---------- Initialize cameras ----------
-    cap_local = cv2.VideoCapture(2)
+    #cap_local = cv2.VideoCapture(2)
+    cap_local = cv2.VideoCapture(0) # MacOS built-in webcam
     if not cap_local.isOpened():
         print("Error: Unable to open cameras, please check indices.")
         return
@@ -50,16 +51,26 @@ def main():
             break
 
         h_l, w_l = frame_l.shape[:2]
-        pts2d_l = None
+        left_hand = None
+        right_hand = None
 
         # --- Hand detection (local and remote) ---
         res_l = hands.process(cv2.cvtColor(frame_l, cv2.COLOR_BGR2RGB))
-        if res_l.multi_hand_landmarks:
-            pts2d_l = landmarks_to_np(res_l.multi_hand_landmarks[0], w_l, h_l)
-
-        
-        if pts2d_l is not None:
-            draw_skeleton(frame_l, pts2d_l)
+        if res_l.multi_hand_landmarks and res_l.multi_handedness:
+            for hand_landmarks, handedness in zip(res_l.multi_hand_landmarks, res_l.multi_handedness):
+                pts2d = landmarks_to_np(hand_landmarks, w_l, h_l)
+                hand_label = handedness.classification[0].label  # "Left" or "Right"
+                
+                if hand_label == "Left":
+                    left_hand = pts2d
+                    draw_skeleton(frame_l, pts2d, color=(0, 255, 0))  # Green for left
+                    cv2.putText(frame_l, "Left", tuple(pts2d[0].astype(int)), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                else:  # "Right"
+                    right_hand = pts2d
+                    draw_skeleton(frame_l, pts2d, color=(255, 0, 0))  # Blue for right
+                    cv2.putText(frame_l, "Right", tuple(pts2d[0].astype(int)), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
         # --- Picture-in-picture ---
         pip = cv2.flip(frame_l, 1)
